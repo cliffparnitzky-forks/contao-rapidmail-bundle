@@ -2,8 +2,10 @@
 
 namespace Alnv\ContaoRapidMailBundle\Hooks;
 
+use Contao\System;
 use Rapidmail\ApiClient\Client;
-
+use Rapidmail\ApiClient\Exception\ApiException;
+use Psr\Log\LogLevel;
 
 class Form {
 
@@ -49,11 +51,26 @@ class Form {
         $arrRapidmailConfig['recipientlist_id'] = $strRecipientlistId;
         $objClient = new Client( \Config::get('rapidmailUsername'), \Config::get('rapidmailPassword') );
         $objRecipientsService = $objClient->recipients();
-        $objRecipientsService->create(
-            $arrRapidmailConfig,
-            [
-                'send_activationmail' => 'yes'
-            ]
-        );
+        
+        try
+        {
+          $objRecipientsService->create(
+              $arrRapidmailConfig,
+              [
+                  'send_activationmail' => 'yes'
+              ]
+          );
+        }
+        catch (ApiException $e)
+        {
+          if ($e->getCode() == 409)
+          {
+            // do nothing, the recipient already existed in the mailing list, okay, who cares ;-)
+          }
+          else
+          {
+            System::getContainer()->get('monolog.logger.contao')->log(LogLevel::ERROR, 'Rapidmail API Exception occured: ' . $e->getMessage());
+          }
+        }
     }
 }
